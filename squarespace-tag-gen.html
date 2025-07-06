@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Squarespace Tag / Filter-Link CSS Generator</title>
+<style>
+  body{font-family:sans-serif;max-width:880px;margin:0 auto;padding:1rem}
+  h1{margin-top:0}
+  fieldset{margin:1rem 0;padding:1rem 1.5rem}
+  fieldset legend{font-weight:bold}
+  label{display:inline-block;margin:0 .5rem .5rem 0}
+  input[type=text]{padding:.25rem .5rem;width:260px;margin-right:.4rem}
+  textarea{width:100%;height:420px;margin-top:.6rem}
+  ul{margin:.25rem 0 0;padding-left:1.2em}
+  li{margin:.25rem 0;position:relative}
+  button{padding:.35rem .8rem;cursor:pointer}
+  .remove-btn{
+    background:#c42e2e;color:#fff;border:none;border-radius:3px;
+    font-size:.75rem;line-height:1;padding:.2rem .45rem;margin-left:.4rem;
+    cursor:pointer
+  }
+  #controls{display:flex;gap:.75rem;margin:1rem 0}
+</style>
+</head>
+<body>
+
+<h1>Portfolio Tag → CSS Generator</h1>
+
+<!-- ROOT LINK -->
+<fieldset>
+  <legend>Root (no-tag) link</legend>
+  <input id="rootLink" placeholder="/work" value="/work">
+</fieldset>
+
+<!-- TAGS -->
+<fieldset>
+  <legend>Add tag</legend>
+  <label>Tag&nbsp;name
+    <input id="tagName" placeholder="art">
+  </label>
+  <label>Tag&nbsp;link
+    <input id="tagLink" placeholder="/work#art">
+  </label>
+  <button id="addTagBtn">Add&nbsp;Tag</button>
+  <ul id="tagList"></ul>
+</fieldset>
+
+<!-- WORKS -->
+<fieldset>
+  <legend>Add work / link</legend>
+  <input id="workPath" placeholder="/work/transpine">
+  <div id="tagCheckboxes"></div>
+  <button id="addWorkBtn">Add&nbsp;Work</button>
+  <ul id="workList"></ul>
+</fieldset>
+
+<div id="controls">
+  <button id="generateBtn">Generate CSS</button>
+  <button id="resetBtn">Reset All</button>
+</div>
+
+<h2>Generated CSS</h2>
+<textarea id="output" readonly></textarea>
+
+<script>
+/* ---------- STATE ---------- */
+const state={tags:[],works:[]};
+
+/* ---------- DOM ---------- */
+const $=id=>document.getElementById(id);
+const rootLinkInput=$('rootLink');
+const tagNameInput=$('tagName');
+const tagLinkInput=$('tagLink');
+const addTagBtn=$('addTagBtn');
+const tagListUl=$('tagList');
+const tagCheckboxes=$('tagCheckboxes');
+const workPathInput=$('workPath');
+const addWorkBtn=$('addWorkBtn');
+const workListUl=$('workList');
+const generateBtn=$('generateBtn');
+const resetBtn=$('resetBtn');
+const outputArea=$('output');
+
+/* ---------- PERSISTENCE ---------- */
+const STORAGE_KEY='portfolioGeneratorState';
+function saveState(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify({
+    tags:state.tags,
+    works:state.works,
+    rootLink:rootLinkInput.value.trim()
+  }));
+}
+function loadState(){
+  const saved=localStorage.getItem(STORAGE_KEY);
+  if(!saved)return;
+  try{
+    const obj=JSON.parse(saved);
+    if(obj.tags)state.tags=obj.tags;
+    if(obj.works)state.works=obj.works;
+    if(obj.rootLink)rootLinkInput.value=obj.rootLink;
+  }catch(e){}
+}
+
+/* ---------- RENDER ---------- */
+function renderTags(){
+  tagListUl.innerHTML=state.tags.map((t,i)=>`
+    <li data-index="${i}">
+      #${t.name} ↦ <code>${t.link}</code>
+      <button class="remove-tag remove-btn" title="Delete tag">✕</button>
+    </li>`).join('');
+  tagCheckboxes.innerHTML=state.tags.map(t=>`
+    <label style="margin-right:8px">
+      <input type="checkbox" value="${t.name}"> ${t.name}
+    </label>`).join('');
+}
+function renderWorks(){
+  workListUl.innerHTML=state.works.map((w,i)=>`
+    <li data-index="${i}">
+      ${w.path} → [${w.tags.join(', ')}]
+      <button class="remove-work remove-btn" title="Delete work">✕</button>
+    </li>`).join('');
+}
+
+/* ---------- ADD / REMOVE ---------- */
+addTagBtn.onclick=()=>{
+  const name=tagNameInput.value.trim();
+  let link=tagLinkInput.value.trim();
+  if(!name)return;
+  if(!link)link=`/work#${name}`;
+  if(!state.tags.find(t=>t.name===name)){
+    state.tags.push({name,link});
+    tagNameInput.value='';tagLinkInput.value='';
+    renderTags();saveState();
+  }
+};
+addWorkBtn.onclick=()=>{
+  const path=workPathInput.value.trim();
+  if(!path)return;
+  const assigned=[...tagCheckboxes.querySelectorAll('input:checked')]
+                 .map(cb=>cb.value);
+  state.works.push({path,tags:assigned});
+  workPathInput.value='';
+  tagCheckboxes.querySelectorAll('input').forEach(cb=>cb.checked=false);
+  renderWorks();saveState();
+};
+/* remove via delegation */
+tagListUl.addEventListener('click',e=>{
+  if(!e.target.matches('.remove-tag'))return;
+  const idx=+e.target.parentElement.dataset.index;
+  const removedName=state.tags[idx].name;
+  state.tags.splice(idx,1);
+  state.works.forEach(w=>w.tags=w.tags.filter(t=>t!==removedName));
+  renderTags();renderWorks();saveState();
+});
+workListUl.addEventListener('click',e=>{
+  if(!e.target.matches('.remove-work'))return;
+  const idx=+e.target.parentElement.dataset.index;
+  state.works.splice(idx,1);
+  renderWorks();saveState();
+});
+/* RESET */
+resetBtn.onclick=()=>{
+  if(!confirm('Delete all tags, works and saved data?'))return;
+  state.tags.length=0;
+  state.works.length=0;
+  rootLinkInput.value='/work';
+  renderTags();renderWorks();saveState();
+  outputArea.value='';
+};
+
+/* ---------- GENERATE CSS ---------- */
+generateBtn.onclick=()=>{
+  const root=rootLinkInput.value.trim();
+  if(!root){alert('Please enter a root link');return;}
+  let css='';
+  /* Filter-link underline logic */
+  css+=`/* --- Filter-link underlines --- */\n`;
+  css+=`#filter-links a{text-decoration:none;}\n`;
+  css+=`#filter-links a[href="${root}"]{text-decoration:underline;}\n\n`;
+  state.tags.forEach(tag=>{
+    /* root loses underline when a tag is active */
+    css+=`#${tag.name}:target~#filter-links a[href="${root}"]{text-decoration:none;}\n`;
+    /* active tag link gains underline */
+    css+=`#${tag.name}:target~#filter-links a[href="${tag.link}"]{text-decoration:underline;}\n\n`;
+  });
+
+  /* Hide tag anchors themselves */
+  state.tags.forEach(t=>css+=`#${t.name}{display:none;}\n`);
+  css+='\n';
+
+  /* Work visibility per tag */
+  state.tags.forEach(tag=>{
+    state.works.forEach(work=>{
+      if(!work.tags.includes(tag.name)){
+        css+=`#${tag.name}:target~section a[href="${work.path}"]{display:none;}\n`;
+      }
+    });
+    css+='\n';
+  });
+
+  outputArea.value=css;
+  saveState();
+};
+
+/* ---------- INIT ---------- */
+loadState();
+renderTags();
+renderWorks();
+</script>
+</body>
+</html>

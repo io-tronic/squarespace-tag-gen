@@ -1,0 +1,5 @@
+This is a small program created to help organize Squarespace portfolio pages without the need for custom code. It generates a css file that allows the use of filtering by tags or categories in Squarespace using the url target selector (the part after the hashtag in `example.com/work#target`). Depending on the target, different parts of your portfolio will be shown or hidden, and if there is no target, everything will be hidden. In order to use this, you must create sections above the project grid with an anchor link matching your tag. By default, the css code generated will hide these sections so they are not visible to the user. Due to a Squarespace quirk, the section cannot be at the very top of the page, so you may have to add a small blank buffer section. 
+
+If you want to add dynamic tag selectors, create a section with the anchor link #filter-links. Any links to a tag or to the root (no tags) will be underlined when the tag is active. 
+
+This project is not affiliated with Squarespace in any way.
